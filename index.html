@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KeMU Email Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --secondary: rgb(107, 0, 62);
+            --background: #f0f4f8;
+            --card-bg: #ffffff;
+            --text: #2d3748;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background);
+            margin: 0;
+            padding: 0;
+            color: var(--text);
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 20px;
+        }
+
+        .upload-card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .file-input-container {
+            margin: 2rem 0;
+            position: relative;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-label {
+            background: var(--primary);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+
+        .file-label:hover {
+            background: #357abd;
+            transform: translateY(-2px);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin: 1rem 0;
+        }
+
+        button {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .generate-btn {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .download-btn {
+            background: var(--primary);
+            color: white;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .preview-container {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+
+        .preview-container h3 {
+            color: var(--text);
+            margin-top: 0;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .preview-table th {
+            background: var(--background);
+            color: var(--text);
+            font-weight: 600;
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .preview-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .preview-table tr:hover {
+            background-color: #f8fafc;
+        }
+
+        .status-message {
+            text-align: center;
+            color: var(--primary);
+            margin: 1rem 0;
+            font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .preview-container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>KeMU Email Generator</h1>
+        <p>Generate student emails efficiently and securely</p>
+    </div>
+
+    <div class="container">
+        <div class="upload-card">
+            <h2>Upload Your File</h2>
+            <div class="file-input-container">
+                <label for="fileInput" class="file-label">
+                    Choose Excel File
+                </label>
+                <input type="file" id="fileInput" accept=".xlsx,.xls">
+            </div>
+            <div class="status-message" id="fileName"></div>
+            <div class="button-group">
+                <button onclick="processFile()" class="generate-btn">Generate Emails</button>
+                <button onclick="downloadResults()" id="downloadBtn" style="display: none;" class="download-btn">Download Results</button>
+            </div>
+        </div>
+
+        <div id="preview" class="preview-container" style="display: none;"></div>
+    </div>
+
+    <script>
+        let processedData = null;
+
+        // Update file name display
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name || 'No file selected';
+            document.getElementById('fileName').textContent = fileName;
+        });
+
+        function cleanName(name) {
+            return name.replace(/[^a-zA-Z\s]/g, '')
+                      .trim()
+                      .replace(/\s+/g, ' ');
+        }
+
+        function generateStudentEmail(row) {
+            const fullName = cleanName(row['NAMES']);
+            const nameParts = fullName.split(' ');
+            
+            const firstName = nameParts[0] || 'user';
+            const lastName = nameParts[nameParts.length - 1] || 'unknown';
+            
+            const studentNumMatch = row['STUDENT NO.'].match(/(\d{4})/);
+            const studentNum = studentNumMatch ? studentNumMatch[1] : '0000';
+            
+            const email = `${firstName[0].toLowerCase()}${lastName.toLowerCase()}${studentNum}@stu.kemu.ac.ke`;
+            const faculty = cleanName(row['SCHOOL/FACULTY']);
+            
+            return {
+                'First Name [Required]': firstName,
+                'Last Name [Required]': lastName,
+                'Email Address [Required]': email,
+                'Password [Required]': '12345679',
+                'Org Unit Path [Required]': `/students/${faculty}`,
+                'Department': row['STUDENT NO.'],
+                'Change Password at Next Sign-In': 'TRUE'
+            };
+        }
+
+        function processFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file first');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                
+                processedData = jsonData.map(generateStudentEmail);
+                
+                displayPreview(processedData);
+                document.getElementById('downloadBtn').style.display = 'inline-block';
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        function displayPreview(data) {
+            const previewDiv = document.getElementById('preview');
+            previewDiv.style.display = 'block';
+            
+            if (!data || data.length === 0) {
+                previewDiv.innerHTML = '<p>No data to display</p>';
+                return;
+            }
+
+            const headers = Object.keys(data[0]);
+            let tableHtml = '<h3>Preview (first 5 records)</h3><table class="preview-table"><thead><tr>';
+            
+            headers.forEach(header => {
+                tableHtml += `<th>${header}</th>`;
+            });
+            tableHtml += '</tr></thead><tbody>';
+            
+            data.slice(0, 5).forEach(row => {
+                tableHtml += '<tr>';
+                headers.forEach(header => {
+                    tableHtml += `<td>${row[header]}</td>`;
+                });
+                tableHtml += '</tr>';
+            });
+            
+            tableHtml += '</tbody></table>';
+            previewDiv.innerHTML = tableHtml;
+        }
+
+        function downloadResults() {
+            if (!processedData || processedData.length === 0) {
+                alert('No data to download');
+                return;
+            }
+
+            const ws = XLSX.utils.json_to_sheet(processedData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Generated Emails");
+            
+            XLSX.writeFile(wb, 'generated_emails.xlsx');
+        }
+    </script>
+</body>
+</html>
